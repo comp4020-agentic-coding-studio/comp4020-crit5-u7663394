@@ -53,6 +53,16 @@ and see `spec/README.md` for how the checks in this repo relate to it.
   be.
 - Commit when the checks pass. Never commit a red state.
 
+  **One deliberate exception, at the top of the week: the tests you write for
+  this week's published spec.** They are committed red, before any prototype
+  exists, because that is what they are for --- the contract arrives first and
+  the work is turning each one green. The red-to-green commits are the process
+  evidence `PROCESS.md` cites. The exception is narrow and it expires: it covers
+  `spec/crit-5.test.ts` on the day it is written, and nothing else, ever. A
+  build that doesn't build, a lint that doesn't pass, a sensor that broke while
+  you were changing something unrelated --- those are red states, and they stay
+  uncommitted.
+
 ## The checks (your sensors)
 
 CI runs these on every push once your repo is public. GitHub's checks UI shows
