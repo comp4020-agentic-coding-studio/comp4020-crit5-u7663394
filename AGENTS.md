@@ -212,7 +212,7 @@ means building legibly is part of building well.
   dump the night before is the weakest.
 - **Keep a process overview** (`PROCESS.md`). A short reading-guide, not an
   essay: what you built, the moments that mattered --- each pointing at a
-  commit, a `CLAUDE.md` change, or a prompt and the commit it produced --- and
+  commit, an `AGENTS.md` change, or a prompt and the commit it produced --- and
   where to look in the history. It points a marker at the evidence; it doesn't
   stand in for it, and claims the history doesn't back don't count. The
   `PROCESS.md` in this repo is a template showing the shape and the citation
@@ -231,7 +231,7 @@ means building legibly is part of building well.
   stays out of the deployed site. It's due at the cutoff, and if it isn't in the
   repo by then the week doesn't count as shipped, however good the prototype is.
 - **This file is process evidence.** The harness you build to direct the agent,
-  this `CLAUDE.md` and any `AGENTS.md`, is itself read as part of how you
+  this `AGENTS.md` and any `CLAUDE.md`, is itself read as part of how you
   worked. Keep it honest and current (see below).
 
 You don't need a name, a student number, or any identity file in the repo: we
@@ -239,7 +239,7 @@ know whose repo it is. Spend the effort on the work.
 
 ## This file is yours
 
-This CLAUDE.md is a starting point, not a fixed rulebook. As you learn what your
+This AGENTS.md is a starting point, not a fixed rulebook. As you learn what your
 prototype needs --- a convention to hold the agent to, a sensor that keeps
 catching you out, a fact about the stack the agent keeps getting wrong --- write
 it down here. Growing this file is the work of harness engineering, and the gap
