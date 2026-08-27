@@ -1,40 +1,56 @@
 ---
+import Layout from "../layouts/Layout.astro";
 import "../styles/styles.css";
+
+// C5 forbids instructions anywhere, so there is no prose on this page and there
+// is not going to be any. Everything below is either the game, the game's name,
+// or an accessible name a screen reader needs to operate it at all.
+//
+// The opening scene is in the served HTML, in CSS, on purpose: a slab hanging
+// off-centre above a slab. The rules and the motion may wait for JavaScript ---
+// that is the brief --- but the *invitation* may not, because the page gets one
+// chance to make the first move obvious and a blank rectangle has spent it.
 ---
-<!doctype html>
-<html lang="en-AU">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>COMP4020 prototype</title>
-    <meta
-      name="description"
-      content="Replace this with one sentence saying what this page is. A search result and a link preview both show it."
-    />
 
-    <!--
-      The link-preview card: public/card.png, 1200x630 --- replace it. The URL
-      resolves against this page, like any link. No og:title/og:description:
-      scrapers fall back to the <title> and description above.
-    -->
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="./card.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-
-  </head>
-  <body>
-    <header>
+<Layout
+  title="One Button Tower"
+  description="A small browser game: time the drop, stack the slabs, build twenty storeys before the tower runs out of width."
+>
+  <div class="app">
+    <header class="topbar">
+      <h1 class="wordmark">One Button Tower</h1>
       <nav aria-label="Primary">
-        <a href="./">Home</a>
+        <a class="nav-link" href="./">New tower</a>
       </nav>
     </header>
-    <main>
-      <h1>COMP4020 prototype</h1>
-      <p>
-        Replace this with your prototype. This week's brief is on the course website;
-        <code>spec/README.md</code> explains how the checks in this repo relate to it.
-      </p>
-    </main>
-    <script src="../scripts/main.ts"></script>
-  </body>
-</html>
+
+    <div class="stage" data-core-output>
+      <canvas class="stage-canvas" data-stage></canvas>
+
+      <div class="opening" aria-hidden="true">
+        <div class="opening-slab opening-slab-held"></div>
+        <div class="opening-slab opening-slab-base"></div>
+      </div>
+
+      <div class="hud">
+        <p class="score" data-score>0</p>
+        <p class="best" data-best></p>
+      </div>
+
+      <div class="verdict" data-verdict hidden role="status">
+        <p class="verdict-word" data-verdict-word></p>
+        <p class="verdict-score" data-verdict-score></p>
+        <span class="verdict-again" aria-hidden="true">&#8635;</span>
+      </div>
+
+      <button
+        class="tap"
+        type="button"
+        data-core-interaction
+        data-code="Space"
+        aria-label="Drop the slab"></button>
+    </div>
+  </div>
+
+  <script src="../scripts/main.ts"></script>
+</Layout>

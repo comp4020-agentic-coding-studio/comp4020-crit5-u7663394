@@ -1,0 +1,39 @@
+---
+// The head, in one place, so every page gets the same one.
+//
+// `description` is a required prop rather than an optional one: an optional
+// description is a description someone forgets, and it is what a search result
+// and a link unfurl both show.
+//
+// The card URL is built absolute from BASE_URL and `site`, never written as
+// "./card.png". A relative card resolves against the page that names it, like
+// any link, so it is right on the home page and wrong on the first page one
+// directory down --- and nothing in CI checks it. The link crawl only follows
+// hrefs; a broken og:image fails silently in a Slack unfurl you never see.
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+const card = new URL(`${import.meta.env.BASE_URL}card.png`, Astro.site).href;
+---
+
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content={card} />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <slot name="head" />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

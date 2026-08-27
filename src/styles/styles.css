@@ -1,16 +1,297 @@
+/* One Button Tower.
+ *
+ * The page is one screen and never scrolls: the stage is the viewport, the
+ * canvas fills the stage, and every overlay is positioned against the stage
+ * rather than in the flow. That is not a layout preference --- it is the rule
+ * from CLAUDE.md about loops that will not settle. A canvas is a replaced
+ * element, so `height: 100%` inside a flex parent falls back to its height
+ * *attribute*, which the drawing code sets from the height it just measured.
+ * Nothing errors and no check goes red; the canvas simply settles smaller than
+ * its box, and in a game that means the drawing and the hit-testing disagree
+ * about where the slabs are. `position: absolute; inset: 0` against a
+ * `position: relative` parent is the fix: the box comes from something that is
+ * not the canvas.
+ *
+ * The custom properties below are the "ember" theme from src/scripts/themes.ts.
+ * They are what a visitor sees before the bundle arrives; main.ts overwrites
+ * them with the round's actual palette on the element style.
+ */
+
+:root {
+  --sky-top: #141212;
+  --sky-bottom: #2c1d18;
+  --ink: #f6f1ea;
+  --slab-top: #b32d31;
+  --slab-left: #950f18;
+  --slab-right: #770d13;
+
+  color-scheme: dark light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
 body {
+  height: 100%;
   margin: 0;
-  padding: 2rem;
-  font-family: system-ui, sans-serif;
-  line-height: 1.6;
-  color: #1a1a1a;
+  overflow: hidden;
 }
 
-main {
-  max-width: 40rem;
-  margin: 0 auto;
+body {
+  background: linear-gradient(var(--sky-top), var(--sky-bottom));
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 200;
+  transition: color 500ms ease;
+  -webkit-font-smoothing: antialiased;
 }
 
-a {
-  color: #0b5fff;
+.app {
+  position: fixed;
+  inset: 0;
+}
+
+/* --- the stage ---------------------------------------------------------- */
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+.stage-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The one control. It covers the whole stage, so the target is the entire
+ * screen at both marking viewports --- a phone player is not aiming at a
+ * 44px button while timing a moving slab. It is a real <button>, which is
+ * where mouse, keyboard and touch all come from without writing three input
+ * paths by hand. */
+.tap {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  appearance: none;
+}
+
+.tap:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: -8px;
+}
+
+/* --- the opening scene, in CSS, before any script runs ------------------- */
+
+.opening {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+[data-ready] .opening {
+  display: none;
+}
+
+/* A slab is a rhombus top face over two side faces. The silhouette is one
+ * clip-path and the top face is a second one on ::before; the proportions
+ * match render.ts, where a slab is 2k wide and 1.44k tall. */
+.opening-slab {
+  --slab-width: min(60%, 42vh);
+
+  position: absolute;
+  top: 56%;
+  left: 50%;
+  width: var(--slab-width);
+  aspect-ratio: 25 / 18;
+  background: linear-gradient(
+    to right,
+    var(--slab-left) 0 50%,
+    var(--slab-right) 50% 100%
+  );
+  clip-path: polygon(
+    50% 0%,
+    100% 34.7%,
+    100% 65.3%,
+    50% 100%,
+    0% 65.3%,
+    0% 34.7%
+  );
+}
+
+.opening-slab::before {
+  position: absolute;
+  inset: 0;
+  background: var(--slab-top);
+  clip-path: polygon(50% 0%, 100% 34.7%, 50% 69.4%, 0% 34.7%);
+  content: "";
+}
+
+.opening-slab-base {
+  translate: -50% -34.7%;
+}
+
+/* Two levels up and a quarter of a slab off centre: the whole invitation. */
+.opening-slab-held {
+  translate: -28% -95.8%;
+  filter: brightness(1.08);
+}
+
+/* --- the chrome --------------------------------------------------------- */
+
+.topbar {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  inset: 0 0 auto;
+  gap: 1rem;
+  pointer-events: none;
+}
+
+.wordmark {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.nav-link {
+  color: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-decoration: none;
+  text-transform: uppercase;
+  opacity: 0.4;
+  pointer-events: auto;
+}
+
+.nav-link:hover,
+.nav-link:focus-visible {
+  opacity: 0.85;
+}
+
+/* --- the readouts ------------------------------------------------------- */
+
+.hud {
+  position: absolute;
+  z-index: 2;
+  text-align: center;
+  inset: 0 0 auto;
+  padding-top: clamp(2.5rem, 7vh, 5rem);
+  pointer-events: none;
+}
+
+/* Fixed boxes on purpose. Text that a measurement writes into must reserve its
+ * height, or the layout depends on a figure measured from the layout and the
+ * page reflows forever. */
+.score {
+  margin: 0;
+  font-size: clamp(3rem, 9vh, 5.5rem);
+  font-weight: 200;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 24px rgb(0 0 0 / 22%);
+}
+
+.best {
+  margin: 0.6rem 0 0;
+  min-height: 1.1em;
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.45;
+}
+
+/* --- the ending --------------------------------------------------------- */
+
+.verdict {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  inset: 0;
+  animation: verdict-in 320ms ease both;
+  pointer-events: none;
+}
+
+.verdict[hidden] {
+  display: none;
+}
+
+.verdict-word {
+  margin: 0;
+  font-size: clamp(2.2rem, 7vh, 4rem);
+  font-weight: 200;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  text-shadow: 0 2px 30px rgb(0 0 0 / 35%);
+}
+
+.verdict-score {
+  margin: 0.5rem 0 0;
+  font-size: 0.86rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.verdict-again {
+  margin-top: 2.2rem;
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  line-height: 1;
+  opacity: 0.7;
+  animation: verdict-pulse 1.8s ease-in-out 700ms infinite;
+}
+
+@keyframes verdict-in {
+  from {
+    opacity: 0;
+    scale: 0.94;
+  }
+
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes verdict-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    scale: 1;
+  }
+
+  50% {
+    opacity: 1;
+    scale: 1.08;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .verdict,
+  .verdict-again {
+    animation: none;
+  }
 }
