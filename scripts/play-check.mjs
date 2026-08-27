@@ -55,6 +55,9 @@ const SETTLE = 600;
 /** How many moves the random-flailing pass makes before giving up on an end. */
 const FLAIL_MOVES = 400;
 
+/** How many rounds to flail before concluding a loss is not reachable. */
+const LOSABLE_ROUNDS = 3;
+
 const BASE = await readBase();
 const URL_UNDER_TEST = `${ORIGIN}${BASE}/`;
 
@@ -221,27 +224,62 @@ try {
       bound.length ? bound.join(" ") : "no [data-code] anywhere",
     );
 
-    let state = opening;
-    let moves = 0;
-    if (bound.length > 0) {
-      const keys = bound.map(press);
-      for (; moves < FLAIL_MOVES && !state.over; moves += 1) {
+    const keys = bound.length > 0 ? bound.map(press) : [];
+
+    /** Flail at the game until it ends or gives up, and report where it got to. */
+    const flail = async () => {
+      let state = await probe();
+      let moves = 0;
+      for (; keys.length > 0 && moves < FLAIL_MOVES && !state.over; moves += 1) {
         await tap(...keys[moves % keys.length]);
         await sleep(40);
         state = await probe();
       }
-    }
+      return { state, moves };
+    };
+
+    const first = await flail();
     check(
       "play ends somewhere under a stranger's hands",
-      state.over === true,
-      state.over
-        ? `${state.outcome} after ${moves} moves`
+      first.state.over === true,
+      first.state.over
+        ? `${first.state.outcome} after ${first.moves} moves`
         : `still playing after ${FLAIL_MOVES} moves`,
     );
     check(
       "and it ends in a named outcome, not merely stopped",
-      ["won", "lost", "finished"].includes(state.outcome),
-      String(state.outcome),
+      ["won", "lost", "finished"].includes(first.state.outcome),
+      String(first.state.outcome),
+    );
+
+    // ...and the half of that spec line the two checks above CANNOT see.
+    //
+    // Earned by a falsification that came back green. The planted fault was the
+    // one CLAUDE.md names -- a game that can never be lost -- built by clamping
+    // the trim so every drop keeps at least 60% of its width. Every check above
+    // stayed green and reported "won after 20 moves", which is true, and which
+    // is not what the spec asks. "It can be lost: a wrong move is possible" and
+    // "play ends somewhere" are two claims, and only the second one was under
+    // test. A check that cannot fail on the fault it is named after is a lie.
+    //
+    // Still no scripted losing line: what is asserted is that losing is
+    // REACHABLE by hands that do not know what they are doing, over a few
+    // rounds, which is the claim the spec makes and the way the pod will play
+    // it. Rounds stop the moment one of them loses, so a losable game pays for
+    // one round and only an unlosable one pays for all of them.
+    const outcomes = [first.state.outcome];
+    for (
+      let attempt = 1;
+      attempt < LOSABLE_ROUNDS && !outcomes.includes("lost");
+      attempt += 1
+    ) {
+      await reload(1200, 900, false);
+      outcomes.push((await flail()).state.outcome);
+    }
+    check(
+      "a wrong move is possible --- it can be LOST, not merely finished",
+      outcomes.includes("lost"),
+      `${outcomes.length} round(s): ${outcomes.join(", ")}`,
     );
 
     // A game that ends and cannot be restarted is a game the pod plays once.
