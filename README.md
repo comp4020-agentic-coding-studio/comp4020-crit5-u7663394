@@ -1,67 +1,63 @@
-# COMP4020 static prototype template
+# One Button Tower
 
-A starter template for static-site prototypes in **COMP4020 / COMP8020 Agentic
-Coding Studio**. The course provisions a repo from this template for each
-deliverable --- you don't create it yourself. The `start` course skill clones it
-for you; from there, build your prototype and deploy it to GitHub Pages.
+A small browser game, built for COMP4020 crit 5. Deployed to GitHub Pages and
+marked live in Chrome at 1920×1080 and 390×844.
 
-## CI and Pages only turn on when you ship
+The brief rules out explaining the game — on screen, in a modal, on a page of
+its own, or here standing in for any of those. So this file is about the repo,
+not about the game. The game is at the deployed URL, and it says everything it
+has to say by moving.
 
-Your repo starts private, and both CI jobs (`check` and `deploy`) are gated on
-it being public. While private, a push to `main` runs nothing in CI ---
-`pnpm check` (below) is your feedback loop until then. When you're ready, the
-course's `/ship` skill flips the repo public, turns on GitHub Pages, and
-dispatches the deploy for you; there's nothing to configure in the Pages
-settings yourself. From that point, every push to `main` builds and deploys, and
-the deploy step prints your live URL and checks it returns 200.
+## What's where
 
-## What gets marked
+| path                       | what it is                                            |
+| -------------------------- | ----------------------------------------------------- |
+| `src/scripts/rules.ts`     | the rules, as pure functions over plain data          |
+| `src/scripts/render.ts`    | the 2:1 isometric drawing                             |
+| `src/scripts/themes.ts`    | six palettes, one picked per round                    |
+| `src/scripts/audio.ts`     | a small synth; no audio files to host                 |
+| `src/scripts/main.ts`      | the loop, the input, and `window.__gameProbe()`       |
+| `src/pages/index.astro`    | the page, and the opening scene in served HTML        |
+| `spec/`                    | the invariants, the travelling sensors, and C5's contract tests |
+| `scripts/`                 | the Chrome sensors and the difficulty measurement     |
+| `reference/`               | the two images the visual language came from          |
 
-The deployed site is the deliverable, assessed live in Chrome at two fixed
-viewports --- see the course website's
-[assessment page](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#marking-environment)
-for the details.
+`src/scripts/rules.ts` is deliberately free of DOM and canvas: the trim — a
+slab keeps only the part that landed on the slab below — is the rule under
+focused test in `spec/crit-5.test.ts`, and it runs in milliseconds without a
+browser.
 
-## Quick start
+## Working in here
 
 ```sh
-mise install       # supported path: install the template's Node and pnpm
 pnpm install
-pnpm dev             # local dev server
-pnpm check           # most of what CI runs (links, secrets and deploy are CI-only)
-pnpm check:evidence  # the process-evidence check CI runs before you ship
-pnpm build           # produce dist/ (what gets deployed)
-
-# reproduce CI's links check before you push
-pnpm dlx linkinator ./dist --silent --skip "^https?://(?!localhost|127)"
+pnpm dev                 # http://localhost:4321/comp4020-crit5-u7663394/
+pnpm check               # typecheck, build, lint, tests --- the fast loop
+pnpm check:render        # real Chrome at both marked viewports
+pnpm check:play          # real Chrome: can it be lost, does play end
+pnpm shots               # full-page screenshots into .shots/
+pnpm check:evidence      # the process-evidence check CI runs
+node scripts/difficulty.mjs   # where each ability of hand dies, over 4000 rounds
 ```
 
-`mise` is the course's recommended runtime manager. If you use another manager
-or the official installers, that is fine: provide the Node and pnpm versions in
-`mise.toml`, then run the same commands. Tutor support reproduces runtime
-problems with mise.
+`pnpm check` is most of what CI runs. The links check, the secrets scan and the
+deploy are CI-only. **Neither Chrome sensor is in `pnpm check`** — both need
+Chrome and a few seconds — so run them before committing anything that touches
+the rules, the input or the drawing.
 
-## What's here
+To reproduce CI's links check locally, serve the build **under the base path**
+and crawl that URL:
 
-- `index.html`, `styles.css`, `main.ts` --- a minimal starting site. Replace it.
-- `mise.toml` --- the tested Node and pnpm versions for this template.
-- `spec/` --- what the checks are for (`README.md`) and the shipped invariants
-  (`invariants.test.ts`); the spec tests you write live alongside them.
-- `CLAUDE.md` --- orients whoever works in this repo, you or a coding agent.
-  Yours to grow.
-- `PROCESS.md` --- a template for your process overview, showing the
-  cited-moment format. Replace it with your own; `pnpm check:evidence` verifies
-  your citations resolve.
-- `.github/workflows/checks.yml` --- the CI sensors that run on every push once
-  your repo is public, and the GitHub Pages deploy.
-- `.githooks/pre-commit` --- blocks any commit that contains something shaped
-  like an API key, so your COMP4020 key can't end up in a public repo. Installed
-  automatically by `pnpm install`.
+```sh
+pnpm build && pnpm preview --port 4989 &
+pnpm dlx linkinator "http://localhost:4989/comp4020-crit5-u7663394/" \
+  --recurse --silent --skip "^https?://(?!localhost|127)"
+```
 
-This template is SSG-agnostic: plain HTML/CSS/TypeScript on Vite, so you can add
-Astro, Eleventy, or any static generator later without changing how it deploys.
-The course plugin's `stack` skill performs the swap for you — to the course
-default (Astro) or bare HTML/CSS — with the Pages base path, lockfile, and CI
-link check handled.
+The `--skip` is not optional: without it the run also checks the absolute
+`og:image`, which 404s until the site is deployed.
 
-See the course site for how the checks map to each week of the course.
+## The process
+
+`PROCESS.md` is the reading guide, with citations. `reflections/crit-5.md` is
+the reflection. `CLAUDE.md` is the harness, and it is read as part of the mark.

@@ -383,6 +383,29 @@ What this has cost so far, which is worth remembering when reading any sensor:
   after, and — the part that actually holds — compares the bytes the server
   hands back against `dist/index.html`. **Check identity, not liveness.** A
   server answering is not evidence it is answering with your build.
+- **Run a sensor through its `pnpm` script, because the script is where the
+  build is.** The same lesson as the daemon above, one level out, and it cost
+  most of an afternoon in C5. `node scripts/render-check.mjs` does *not* build;
+  `pnpm check:render` is `pnpm build && node scripts/render-check.mjs`. Half a
+  dozen runs went into diagnosing a blank canvas that had already been fixed,
+  against a `dist/` from before the fix — and because the fault was real once,
+  every reading was consistent and plausible. `waitForServer` compares the
+  served bytes to `dist/index.html`, so it catches a stale *server*; nothing
+  catches a stale *`dist/`*, because from the sensor's point of view there is
+  nothing wrong. **If a sensor disagrees with a change you just made, rebuild
+  before you investigate.**
+- **`requestAnimationFrame` is a request, not a promise.** Measured in headless
+  Chrome on the same page in the same run: ~16 callbacks a second on one
+  viewport and **zero** on the other. Assigning `canvas.width` or
+  `canvas.height` *clears* the bitmap, so a resize handler that clears and then
+  waits for the next frame to repaint leaves the stage blank for as long as the
+  frame takes to arrive — which can be forever, and is long enough to matter in
+  a throttled tab, a backgrounded window or a low-power mode. Every DOM sensor
+  stays green through it; only the ink probe and the screenshot see it. So
+  **repaint synchronously on the thread that cleared it**, and repaint on every
+  state change rather than leaving the screen to catch up next frame. The
+  second half of that is not just robustness: a readout that only updates in
+  the loop reads stale to a sensor and *late* to a player.
 - **A canvas is opaque to every DOM sensor.** Squeezing the drawing off the side
   of a phone left the stage blank while the markup check, the interaction check,
   the overflow check and the exception listener all stayed green. `check:render`
@@ -412,8 +435,12 @@ What this has cost so far, which is worth remembering when reading any sensor:
   master gain, a skipped `init()` and a `noteOff` that returns early. All three
   audio faults printed the right sentence. A check that has never been seen to
   go red is a decoration. Don't just ask whether the check *can* fail in
-  principle; watch it. **This week's faults to plant:** a game that can never be
-  lost, and one that ends but reports the wrong outcome.
+  principle; watch it. **C5's two faults were planted and all three results are
+  written down**: a game that can never be lost (green at first — see the
+  conjunction note below — red once the missing clause was checked), an ending
+  reporting an outcome nothing names (red on two checks), and a third worth
+  planting next time, a game that **loses and reports a win** (red on one check
+  only, and nothing else in the repo could have told it from a win).
 - **A check that cannot fail on the fault it is named after is a lie.** The
   first version of "twelve keys share one particle budget" compared standing
   counts after 2.5s of holding, and stayed green against a planted fault that
@@ -422,6 +449,20 @@ What this has cost so far, which is worth remembering when reading any sensor:
   both are still filling, it compares the spawn rate instead: healthy 1.8x,
   faulty 4.7x, threshold 3.5. **When a falsification comes back green, the
   first suspect is the check, not the fault.**
+
+  **C5 found the second shape of this, and it is the one to look for first:
+  the check was testing only one clause of its own sentence.** `check:play` was
+  named after "it can be lost: a wrong move is possible, and play ends
+  somewhere" and asserted only the second half. An unlosable game — the trim
+  clamped so every drop keeps 60% of its width — sailed through 7/7 and
+  reported `won after 20 moves`. True, and not what the line says. So: **when a
+  spec line is a conjunction, count the clauses and count the assertions.** A
+  check named after an "and" that tests one side is a lie in exactly the way the
+  particle budget was, and it is harder to see, because the sentence in the
+  comment above it reads correctly. The fix here was to add a check that flails
+  several rounds and requires at least one to *lose* — reachability of the
+  losing state, not a scripted losing line. It is also the only thing in the
+  repo that can catch a game which loses and reports a win.
 - **A falsification that stays green tells you something too.** C4's fourth
   planted fault — deleting the `resume()` call from the gesture handler — did
   *not* go red, because Chrome auto-starts an autoplay-blocked `AudioContext`
@@ -576,6 +617,39 @@ invitation.
   whole 34ms. An afternoon spent making particles cheaper would have bought
   nothing. A `/tmp` throwaway that installs a rAF counter and reports p50/p95
   is enough; it does not need to be a permanent sensor to be worth writing.
+
+  **C5's version of this is about balance, not frames, and it is why the rules
+  should be pure functions.** Watching a robot flail at the game, the obvious
+  conclusion was "too punishing" and the obvious fix was a more forgiving
+  tolerance. Four thousand simulated rounds per ability — a hand modelled as a
+  timing error in milliseconds, played straight against `rules.ts` with no
+  browser, in a few milliseconds — said a newcomer's median was already 7 of 20
+  and an expert already won about a fifth of the time, and that the tolerance
+  knob moved *only* the expert's win rate. The change I was about to make was
+  the wrong one, and the measurement that stopped it was possible only because
+  the rules had no DOM in them. **A tuning number is not a contract**, so this
+  stays out of `pnpm check`; it is a throwaway that earned a filename.
+- **An overlay's colour comes from the palette its text was designed against,
+  never from black.** The ending screen's veil: a black scrim is the reflex, and
+  it was right on five of six palettes and wrong on the light one, whose ink is
+  dark — there the veil destroys the contrast it was added to create. Veiling
+  with the *theme's own* background colour is correct for every palette by
+  construction, because that is the colour the ink was chosen to read on. One
+  line instead of six spot-checks and a special case.
+- **The affordance that lets the player continue must not be drawn over the
+  thing they just made.** The replay glyph sat exactly where the top of the
+  tower sits, in the same tone, so the better a player did the less visible
+  their way back in became. This is the general form: **an overlay positioned
+  against the viewport will collide with content positioned against the
+  viewport** — check it at the state where the content is *biggest*, not at the
+  opening. Nothing but a screenshot of a finished round shows it.
+- **Two numbers describing one object in two languages are one number.** The
+  opening scene is drawn in CSS and then in canvas, so the slab's size exists as
+  `min(60%, 50vh)` and as `min(w * 0.3, h * 0.25)`. They have to move together
+  or the page pops the moment the script boots. Neither a type nor a test can
+  couple them across the language boundary, so each site carries a comment
+  naming the other. **When a value must be duplicated, make the duplication
+  say so.**
 
 ## Two things the toolchain will keep telling you
 

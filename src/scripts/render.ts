@@ -45,7 +45,15 @@ export interface Geometry {
  * Projection scale for a canvas box.
  *
  * Width-led with a height cap: a wide desktop would otherwise draw a slab so
- * large the tower never fits, and a tall phone one so small it disappears.
+ * large the tower never fits, and a tall phone one so small it disappears. The
+ * phone viewport is width-limited and the desktop one height-limited, so the
+ * two constants are tuned against different screens; both were set by looking
+ * at `pnpm shots` at 390x844 and 1920x1080, not by arithmetic.
+ *
+ * COUPLED to `--slab-width: min(60%, 50vh)` on `.opening-slab` in
+ * src/styles/styles.css, which draws the same slab in CSS for the moment before
+ * this file exists. 2 * 0.3 = 60% and 2 * 0.25 = 50vh; change one and change
+ * the other, or the page pops the instant the script boots.
  */
 export function geometryFor(w: number, h: number): Geometry {
   const k = Math.min(w * 0.3, h * 0.25);
