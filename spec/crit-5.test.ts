@@ -3,6 +3,17 @@ import { join, relative, resolve, sep } from "node:path";
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 
+import {
+  applyDrop,
+  newGame,
+  resolveDrop,
+  scoreOf,
+  SNAP,
+  START_WIDTH,
+  WIN_AT,
+  type Slab,
+} from "../src/scripts/rules";
+
 // C5 "A game" --- the mechanically checkable lines of the published spec,
 // asserted against the BUILT site so they check what actually ships.
 //
@@ -170,6 +181,104 @@ describe("C5: it can be lost, and play ends somewhere", () => {
         `reach. Expose { over, outcome, moves }. (Searched every bundled ` +
         `module and inline script in dist/.)`,
     ).toBe(true);
+  });
+});
+
+describe("C5: the trim rule --- the one rule under a focused test", () => {
+  // "one rule of the game has a focused automated test." The rule this game is
+  // *made of* is the trim: a slab keeps only the part that landed on the slab
+  // below, and what it keeps is the width the next slab gets. Every other
+  // interesting thing --- that it gets harder, that it can be lost at all,
+  // that twenty is reachable --- is downstream of this arithmetic.
+  //
+  // It is asserted against src/scripts/rules.ts directly, with no DOM and no
+  // Chrome, because that is what makes it *focused*: it names the rule and
+  // nothing about how the rule is drawn. Rewriting the renderer, the input, or
+  // the whole visual language cannot redden it; changing the rule is the only
+  // thing that can. check:play covers the other half --- that a stranger's
+  // hands reach an ending --- and needs a browser to do it.
+
+  const base: Slab = { x: 0, w: START_WIDTH };
+
+  it("keeps exactly the overlapping fraction: 60% over means 60% left", () => {
+    // Offset by 40% of the width, so 60% of the slab is over the one below.
+    const landed = resolveDrop(base, { x: 0.4, w: START_WIDTH });
+
+    expect(landed.hit).toBe(true);
+    expect(landed.perfect).toBe(false);
+    expect(landed.placed?.w).toBeCloseTo(0.6, 10);
+    // …and it keeps the part that was actually over the base, not a slab of
+    // the right width parked anywhere: the base spans -0.5 to 0.5 and the slab
+    // spans -0.1 to 0.9, so the survivor is -0.1 to 0.5, centred on 0.2.
+    expect(landed.placed?.x).toBeCloseTo(0.2, 10);
+  });
+
+  it("sheds exactly the overhang, on the side it overhung", () => {
+    const landed = resolveDrop(base, { x: 0.4, w: START_WIDTH });
+
+    expect(landed.slice?.w).toBeCloseTo(0.4, 10);
+    // The overhang spans 0.5 to 0.9 --- past the right edge of the base.
+    expect(landed.slice?.x).toBeCloseTo(0.7, 10);
+    // Nothing is created or destroyed: kept + shed is the slab that fell.
+    expect((landed.placed?.w ?? 0) + (landed.slice?.w ?? 0)).toBeCloseTo(
+      START_WIDTH,
+      10,
+    );
+  });
+
+  it("is symmetric --- overhanging left trims the same as overhanging right", () => {
+    const right = resolveDrop(base, { x: 0.4, w: START_WIDTH });
+    const left = resolveDrop(base, { x: -0.4, w: START_WIDTH });
+
+    expect(left.placed?.w).toBeCloseTo(right.placed?.w ?? 0, 10);
+    expect(left.placed?.x).toBeCloseTo(-(right.placed?.x ?? 0), 10);
+    expect(left.slice?.x).toBeCloseTo(-(right.slice?.x ?? 0), 10);
+  });
+
+  it("forgives a landing inside the snap tolerance, losing no width at all", () => {
+    const landed = resolveDrop(base, { x: SNAP * 0.9, w: START_WIDTH });
+
+    expect(landed.perfect).toBe(true);
+    expect(landed.placed?.w).toBe(START_WIDTH);
+    // Snapped back to centre, so a run of near-perfect drops cannot drift the
+    // tower sideways one hair at a time.
+    expect(landed.placed?.x).toBe(0);
+    expect(landed.slice).toBeNull();
+  });
+
+  it("ends the round when the slab misses the tower completely", () => {
+    // The losing move, which is the other line of the spec this arithmetic
+    // decides: past the far edge there is no overlap, so nothing is placed.
+    const narrow = { stack: [{ x: 0, w: 0.3 }] } as const;
+    const state = { ...newGame(), stack: narrow.stack };
+    const { state: after, result } = applyDrop(state, { x: 0.8, w: 0.3 });
+
+    expect(result.hit).toBe(false);
+    expect(result.placed).toBeNull();
+    expect(after.outcome).toBe("lost");
+    expect(after.stack).toHaveLength(1); // nothing was added to the tower
+    expect(after.moves).toBe(1); // …but the move was still counted
+  });
+
+  it("declares a win once the twentieth slab lands, and not before", () => {
+    let state = newGame();
+    for (let i = 0; i < WIN_AT; i += 1) {
+      expect(state.outcome).toBe("playing");
+      state = applyDrop(state, { ...state.stack[state.stack.length - 1] }).state;
+    }
+    expect(scoreOf(state)).toBe(WIN_AT);
+    expect(state.outcome).toBe("won");
+  });
+
+  it("cannot be played on after it has ended", () => {
+    const lost = applyDrop(
+      { ...newGame(), stack: [{ x: 0, w: 0.2 }] },
+      { x: 0.9, w: 0.2 },
+    ).state;
+    const again = applyDrop(lost, { x: 0, w: 0.2 });
+
+    expect(again.state).toBe(lost);
+    expect(again.result.placed).toBeNull();
   });
 });
 
