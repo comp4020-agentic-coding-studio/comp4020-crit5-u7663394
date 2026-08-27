@@ -30,6 +30,7 @@ import {
 } from "./render";
 import {
   applyDrop,
+  guideStrength,
   newGame,
   scoreOf,
   SWEEP,
@@ -130,6 +131,8 @@ let round = startRound(pickTheme());
 let motes: Mote[] = [];
 let camLevel = 1;
 let camX = 0;
+/** Rendered guide strength, chasing guideStrength(score). See step(). */
+let guide = guideStrength(0);
 let last = performance.now();
 let best = readBest();
 
@@ -196,6 +199,7 @@ function sceneNow(now: number): Scene {
     camLevel,
     camX,
     shake: reduced.matches ? 0 : round.shake,
+    guide,
   };
 }
 
@@ -305,6 +309,7 @@ function restart() {
   round = startRound(pickTheme(round.theme));
   camLevel = 1;
   camX = 0;
+  guide = guideStrength(0);
   verdict.hidden = true;
   delete verdict.dataset.outcome;
   button.setAttribute("aria-label", "Drop the slab");
@@ -369,6 +374,12 @@ function step(dt: number) {
   const follow = Math.min(1, dt * 9);
   camLevel += (round.game.stack.length - camLevel) * follow;
   camX += (topOf(round.game).x - camX) * follow;
+
+  // guideStrength() steps down once per slab; this chases it so the guide dims
+  // *through* a drop rather than blinking at the moment of one. The eased value
+  // is only ever an alpha, so the two layers of easing CLAUDE.md warns about
+  // cannot compound here --- the rule owns the schedule, this owns the fade.
+  guide += (guideStrength(scoreOf(round.game)) - guide) * Math.min(1, dt * 4);
 
   round.settleT = Math.max(0, round.settleT - dt);
   round.shake *= 1 - Math.min(1, dt * 7);

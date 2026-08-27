@@ -582,6 +582,28 @@ one again this week** — a state read before a move has resolved is the same bu
 wearing a different hat, and a game has more animation between input and settled
 state than a piano key did.
 
+C5 added two more shapes of the same mistake, and both were found by a result
+that looked like bad *code* and was bad *measurement*:
+
+- **A check whose precondition a later step can undo.** The focused-button check
+  set its focus up outside the helper that makes the move, and that helper
+  reloads the page when the previous check ended the round — throwing the focus
+  away, so the check quietly measured the unfocused path and passed. It surfaced
+  only because a planted double-fire fault *failed* to redden it. Setup belongs
+  inside the step, after any reset, never before it.
+- **A driver that plays the game must anchor to the page's clock.** A scripted
+  player aimed each press a quarter-period after its own previous press —
+  correct from the second move on, and meaningless for the first, because
+  nothing told it when the *page* had started moving. Measured: 612ms of error
+  on move one, two thirds of the opening slab gone, and three input paths
+  scoring 2–6 where a pure-rules simulation of the same hand said 13. That gap
+  read exactly like an unfair difficulty curve, and I nearly retuned a curve
+  that was already right. Anchoring on something the page does — the moment
+  `window.__gameProbe` first answers, a few ms after the first slab starts —
+  took the error to 71ms and the two measurements agreed. **When a driven
+  measurement disagrees with a model of the same thing, suspect the driver: it
+  has a clock of its own and the page does not share it.**
+
 ## Never make content visibility depend on JavaScript
 
 If content is hidden by default and revealed by script, the reveal is a race and

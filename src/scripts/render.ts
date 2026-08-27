@@ -20,7 +20,7 @@
 //     always the unfair one.
 
 import type { Slab } from "./rules";
-import { WIN_AT } from "./rules";
+import { SWEEP, WIN_AT } from "./rules";
 import { mix, rampAt, shade, toCss, type Rgb, type Theme } from "./themes";
 
 /** Screen height of a slab, as a fraction of the projection scale. */
@@ -47,16 +47,27 @@ export interface Geometry {
  * Width-led with a height cap: a wide desktop would otherwise draw a slab so
  * large the tower never fits, and a tall phone one so small it disappears. The
  * phone viewport is width-limited and the desktop one height-limited, so the
- * two constants are tuned against different screens; both were set by looking
- * at `pnpm shots` at 390x844 and 1920x1080, not by arithmetic.
+ * two terms are tuned against different screens.
  *
- * COUPLED to `--slab-width: min(60%, 50vh)` on `.opening-slab` in
+ * The width term is DERIVED, not chosen. A slab at the far end of its sweep
+ * reaches `SWEEP + w/2` in world units, and its rightmost screen point adds
+ * another `DEPTH / 2` from the projection — so half the canvas has to hold
+ * `0.5 + SWEEP + DEPTH / 2` world units or the slab slides off the edge at the
+ * extremes of its travel. It did: at 390px the opening slab was clipped by
+ * about 20px twice a sweep, which is the one viewport where losing sight of the
+ * thing you are timing is least affordable. Writing `0.27` here instead would
+ * have been the same number with the reason deleted, and would go quietly wrong
+ * the day SWEEP moves.
+ *
+ * COUPLED to `--slab-width: min(54%, 50vh)` on `.opening-slab` in
  * src/styles/styles.css, which draws the same slab in CSS for the moment before
- * this file exists. 2 * 0.3 = 60% and 2 * 0.25 = 50vh; change one and change
- * the other, or the page pops the instant the script boots.
+ * this file exists: a slab is 2k wide, so the two percentages are twice the two
+ * terms below. Change one and change the other, or the page pops the instant
+ * the script boots.
  */
 export function geometryFor(w: number, h: number): Geometry {
-  const k = Math.min(w * 0.3, h * 0.25);
+  const widest = 0.5 + SWEEP + DEPTH / 2;
+  const k = Math.min(w / (2 * widest), h * 0.25);
   return { k, bh: k * BLOCK, ox: w / 2, oy: h * HORIZON, w, h };
 }
 
@@ -110,6 +121,8 @@ export interface Scene {
   readonly camLevel: number;
   readonly camX: number;
   readonly shake: number;
+  /** How strongly to draw the landing guide: 1 early, 0 once the game asks. */
+  readonly guide: number;
 }
 
 /** Slab colour is a function of height, not of the slab: see themes.ts. */
@@ -168,6 +181,83 @@ function drawSlab(
   face(ctx, [d, c, down(c), down(d)], toCss(left));
   face(ctx, [b, c, down(c), down(b)], toCss(right));
   face(ctx, [a, b, c, d], toCss(top));
+}
+
+/**
+ * The landing guide: where the slab has to be for a clean drop.
+ *
+ * It is the footprint of the slab below, drawn as an outline at the altitude
+ * the slab is *currently* flying at, with two verticals tying it down to the
+ * tower. Aim the moving slab into the outline and the drop is perfect.
+ *
+ * The obvious version is a pair of vertical rails rising from the tower's
+ * corners, and it is wrong here, because in this projection a slab moving along
+ * world X travels *diagonally* on screen: one world unit right is (k, k * TILT)
+ * — right AND down. Vertical rails would ask the player to line up against
+ * lines the slab never travels along. A target at the slab's own altitude is
+ * the same comparison the eye is already making.
+ *
+ * Drawn under the moving slab and over the tower, so the slab occludes the
+ * target as it covers it — which is itself the feedback, without a word.
+ */
+function drawGuide(
+  ctx: CanvasRenderingContext2D,
+  project: ReturnType<typeof projector>,
+  g: Geometry,
+  scene: Scene,
+) {
+  if (scene.guide <= 0 || !scene.moving) return;
+
+  const base = scene.stack[scene.stack.length - 1];
+  const topLevel = scene.stack.length;
+  const flying = topLevel + 1 + scene.hover;
+  const x0 = base.x - base.w / 2;
+  const x1 = base.x + base.w / 2;
+
+  const corner = (x: number, z: number, level: number) => project(x, z, level);
+  const target: Point[] = [
+    corner(x0, 0, flying),
+    corner(x1, 0, flying),
+    corner(x1, DEPTH, flying),
+    corner(x0, DEPTH, flying),
+  ];
+
+  ctx.save();
+  // `ink`, not `spark`. Sparks are white on five of the six palettes, which is
+  // right for a flash against a slab and invisible against the pale sky of the
+  // light one. `ink` is the colour every theme guarantees reads against its own
+  // sky --- the same reason the ending's scrim is built from the sky colour.
+  ctx.strokeStyle = scene.theme.ink;
+  ctx.lineWidth = Math.max(1, g.k * 0.01);
+  ctx.lineJoin = "round";
+
+  // The two verticals, from the target's side corners down to the tower's, so
+  // the outline reads as "directly above there" rather than as a floating
+  // rectangle. Dashed and fainter than the target: they are the sentence's
+  // subordinate clause.
+  ctx.globalAlpha = scene.guide * 0.3;
+  ctx.setLineDash([g.k * 0.05, g.k * 0.05]);
+  for (const [x, z] of [
+    [x1, 0],
+    [x0, DEPTH],
+  ] as const) {
+    const from = corner(x, z, flying);
+    const to = corner(x, z, topLevel);
+    ctx.beginPath();
+    ctx.moveTo(from[0], from[1]);
+    ctx.lineTo(to[0], to[1]);
+    ctx.stroke();
+  }
+
+  ctx.setLineDash([]);
+  ctx.globalAlpha = scene.guide * 0.62;
+  ctx.beginPath();
+  ctx.moveTo(target[0][0], target[0][1]);
+  for (const [x, y] of target.slice(1)) ctx.lineTo(x, y);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
 function drawSky(ctx: CanvasRenderingContext2D, g: Geometry, scene: Scene) {
@@ -260,6 +350,8 @@ export function draw(ctx: CanvasRenderingContext2D, g: Geometry, scene: Scene) {
     ctx.restore();
   }
   ctx.globalAlpha = 1;
+
+  drawGuide(ctx, project, g, scene);
 
   if (scene.moving) {
     drawSlab(

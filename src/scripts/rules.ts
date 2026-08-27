@@ -158,14 +158,63 @@ export function applyDrop(state: GameState, moving: Slab): DropOutcome {
 }
 
 /**
+ * The height at which the game stops helping and starts asking.
+ *
+ * Below it the sweep is slow and the drawing shows a target; above it the sweep
+ * tightens every slab and the target is gone. It is one number because the two
+ * halves have to agree about where the boundary is --- a guide that outlasts the
+ * slow sweep, or a speed-up that arrives before the guide leaves, is a player
+ * being lied to about which game they are playing.
+ */
+export const GUIDE_UNTIL = 10;
+
+/** Over how many slabs the guide fades out, ending exactly at GUIDE_UNTIL. */
+const GUIDE_FADE = 3;
+
+/**
  * Seconds for one full there-and-back sweep at this height.
  *
- * The tower narrowing is the difficulty curve; this is a second, gentler one so
- * that a player who has learnt the timing still has something to learn at slab
- * fifteen. Clamped, because a sweep faster than a reaction is not difficulty.
+ * Two segments, because the two halves of the game want opposite things.
+ *
+ *   0 -> 10   3.00s down to 2.40s. Nearly flat: a newcomer has most of three
+ *             seconds to watch the slab cross, and the only difficulty they
+ *             meet is the tower narrowing, one idea at a time.
+ *   10 -> 19  2.40s down to 0.85s. Three times the slope. The guide has just
+ *             gone; this is what replaces it.
+ *   19 -> 20  held at 0.85s, so the finish is a steady hard speed rather than
+ *             an acceleration into the line. Ending on the fastest slab the
+ *             player has ever seen makes the last drop a lottery, and losing at
+ *             19 to a speed you never got to learn does not read as fair.
+ *
+ * The value is continuous at the join --- both segments give 2.40s at 10 --- so
+ * nothing jumps at the boundary. What changes is the *rate*, which is felt over
+ * the next few slabs rather than noticed at one.
+ *
+ * The constants are measured, not guessed: scripts/difficulty.mjs plays 4000
+ * rounds per ability against these functions. At this setting a newcomer's
+ * median is 9 and two in five reach the transition (was 7 and one in ten), a
+ * practised hand lands around 13 to 16, and an expert wins about a third of the
+ * time. Reaching 20 stays worth something.
  */
 export function sweepPeriod(height: number): number {
-  return Math.max(1.25, 2.3 - height * 0.05);
+  if (height <= GUIDE_UNTIL) return 3 - height * 0.06;
+  return Math.max(0.85, 2.4 - (height - GUIDE_UNTIL) * 0.18);
+}
+
+/**
+ * How strongly to draw the landing guide at this height: 1 early, 0 from
+ * GUIDE_UNTIL on, with a fade over the last few slabs.
+ *
+ * Fading rather than switching for the reason C5 cares about: nothing on this
+ * page may explain itself, so a guide that vanished between one slab and the
+ * next would read as a bug, or as a punishment for having done well. Three
+ * slabs of dimming reads as the game stepping back.
+ */
+export function guideStrength(height: number): number {
+  if (height >= GUIDE_UNTIL) return 0;
+  const solidUntil = GUIDE_UNTIL - GUIDE_FADE;
+  if (height <= solidUntil) return 1;
+  return (GUIDE_UNTIL - height) / GUIDE_FADE;
 }
 
 /**

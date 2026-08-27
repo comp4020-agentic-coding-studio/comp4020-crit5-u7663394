@@ -52,6 +52,17 @@ body {
 .app {
   position: fixed;
   inset: 0;
+
+  /* Three separate highlights the browser adds for free, all of which read as
+   * "you have selected the game" rather than as feedback about the game.
+   * Removing the text selection also removes the accidental drag-select you get
+   * from a mistimed click, which on a click-to-play game is every other click. */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: none;
 }
 
 /* --- the stage ---------------------------------------------------------- */
@@ -86,9 +97,27 @@ body {
   appearance: none;
 }
 
+/* No focus ring on this one, and that is a decision rather than an omission.
+ *
+ * A focus indicator exists to answer "where am I?". This control is the entire
+ * viewport, so an outline around it draws a white rectangle round the whole
+ * screen and answers nothing — it cannot distinguish itself from any other
+ * position, because there is no other position it could be. It also fired on
+ * every Space press and every click, which is exactly when the player is
+ * looking at the slab.
+ *
+ * What keeps this from being an accessibility regression:
+ *   - the page has exactly one other focusable element, the nav link, and that
+ *     one keeps a real focus ring below — so Tab order is still visible where
+ *     visibility means something;
+ *   - focus is not silent here. The control's response to being operated *is*
+ *     a slab dropping, full-screen, with sound. A keyboard player pressing
+ *     Space knows immediately whether they had focus.
+ * Both Chrome sensors check reachability (`document.activeElement`), not
+ * styling, so this changes what is drawn and nothing about what is operable.
+ */
 .tap:focus-visible {
-  outline: 3px solid var(--ink);
-  outline-offset: -8px;
+  outline: none;
 }
 
 /* --- the opening scene, in CSS, before any script runs ------------------- */
@@ -104,13 +133,16 @@ body {
 }
 
 /* A slab is a rhombus top face over two side faces. The silhouette is one
- * clip-path and the top face is a second one on ::before; the proportions
- * match render.ts, where a slab is 2k wide and 1.44k tall and
- * k = min(30% of the width, 25% of the height) --- hence 60% and 50vh. These
- * two numbers have to move together with geometryFor(): they are the same slab
- * drawn twice, and a mismatch is a visible pop the moment the script boots. */
+ * clip-path and the top face is a second one on ::before; the proportions match
+ * render.ts, where a slab is 2k wide and 1.44k tall.
+ *
+ * The 54% and the 50vh are twice geometryFor()'s two terms, so they have to
+ * move with it: this is the same slab drawn twice, in two languages, and a
+ * mismatch is a visible pop the instant the script boots. The 54% in particular
+ * is not a taste decision — it is what keeps a slab at the far end of its sweep
+ * on a 390px screen. See the note on geometryFor(). */
 .opening-slab {
-  --slab-width: min(60%, 50vh);
+  --slab-width: min(54%, 50vh);
 
   position: absolute;
   top: 56%;
@@ -186,6 +218,14 @@ body {
 .nav-link:hover,
 .nav-link:focus-visible {
   opacity: 0.85;
+}
+
+/* The one focus ring that survives. It is small, it is in a corner, and it is
+ * the only element where "where am I?" has more than one possible answer. */
+.nav-link:focus-visible {
+  outline: 2px solid currentcolor;
+  outline-offset: 4px;
+  border-radius: 2px;
 }
 
 /* --- the readouts ------------------------------------------------------- */
