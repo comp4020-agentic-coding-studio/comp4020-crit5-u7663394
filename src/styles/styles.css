@@ -24,6 +24,7 @@
   --slab-top: #b32d31;
   --slab-left: #950f18;
   --slab-right: #770d13;
+  --scrim: rgb(20 18 18 / 82%);
 
   color-scheme: dark light;
 }
@@ -104,9 +105,12 @@ body {
 
 /* A slab is a rhombus top face over two side faces. The silhouette is one
  * clip-path and the top face is a second one on ::before; the proportions
- * match render.ts, where a slab is 2k wide and 1.44k tall. */
+ * match render.ts, where a slab is 2k wide and 1.44k tall and
+ * k = min(30% of the width, 25% of the height) --- hence 60% and 50vh. These
+ * two numbers have to move together with geometryFor(): they are the same slab
+ * drawn twice, and a mismatch is a visible pop the moment the script boots. */
 .opening-slab {
-  --slab-width: min(60%, 42vh);
+  --slab-width: min(60%, 50vh);
 
   position: absolute;
   top: 56%;
@@ -218,6 +222,21 @@ body {
 
 /* --- the ending --------------------------------------------------------- */
 
+/* The scrim is here because of a playtest, not a preference.
+ *
+ * Without it the verdict is centred over the stage and the top of the tower is
+ * at 56% of it, so "Game over", "11 of 20" and the replay glyph all land ON the
+ * slabs. On the desktop viewport the score line was illegible and the glyph was
+ * a thin ring drawn over a same-tone top face --- and under a no-tutorial rule
+ * that glyph is the ONLY thing telling a player they may go again. The one
+ * affordance the ending has was camouflaged by the thing the player had just
+ * built.
+ *
+ * The veil is the theme's own sky colour rather than black, set from JS: the
+ * ink of every theme was chosen to read against the top of its sky, so veiling
+ * with that colour keeps the contrast the palette was designed for. A black
+ * scrim would have been wrong on the one light theme, where the ink is dark.
+ */
 .verdict {
   position: absolute;
   z-index: 3;
@@ -225,6 +244,7 @@ body {
   justify-items: center;
   align-content: center;
   inset: 0;
+  background: var(--scrim);
   animation: verdict-in 320ms ease both;
   pointer-events: none;
 }
@@ -251,16 +271,16 @@ body {
 }
 
 .verdict-again {
-  margin-top: 2.2rem;
+  margin-top: 2.4rem;
   display: grid;
   place-items: center;
-  width: 3.2rem;
-  height: 3.2rem;
+  width: 3.4rem;
+  height: 3.4rem;
   border: 1px solid currentcolor;
   border-radius: 50%;
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   line-height: 1;
-  opacity: 0.7;
+  opacity: 0.75;
   animation: verdict-pulse 1.8s ease-in-out 700ms infinite;
 }
 

@@ -48,7 +48,7 @@ export interface Geometry {
  * large the tower never fits, and a tall phone one so small it disappears.
  */
 export function geometryFor(w: number, h: number): Geometry {
-  const k = Math.min(w * 0.3, h * 0.21);
+  const k = Math.min(w * 0.3, h * 0.25);
   return { k, bh: k * BLOCK, ox: w / 2, oy: h * HORIZON, w, h };
 }
 

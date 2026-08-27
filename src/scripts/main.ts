@@ -41,7 +41,14 @@ import {
   type Outcome,
   type Slab,
 } from "./rules";
-import { pickTheme, rampAt, toCss, shade, type Theme } from "./themes";
+import {
+  parseHex,
+  pickTheme,
+  rampAt,
+  shade,
+  toCss,
+  type Theme,
+} from "./themes";
 
 declare global {
   interface Window {
@@ -315,6 +322,11 @@ function applyTheme(theme: Theme) {
   root.setProperty("--sky-top", theme.sky[0]);
   root.setProperty("--sky-bottom", theme.sky[1]);
   root.setProperty("--ink", theme.ink);
+  // The ending's veil. The theme's own sky-top colour, because that is the
+  // colour every theme's ink was chosen to be legible against --- see the note
+  // on .verdict in styles.css for the playtest that put it here.
+  const [r, g, b] = parseHex(theme.sky[0]);
+  root.setProperty("--scrim", `rgb(${r} ${g} ${b} / 0.82)`);
   const slab = rampAt(theme, 0);
   root.setProperty("--slab-top", toCss(shade(slab, 0.12)));
   root.setProperty("--slab-left", toCss(shade(slab, -0.1)));
