@@ -42,10 +42,15 @@ both from looking rather than from a red check: the `og:image` was silently
 404ing (`BASE_URL` has no trailing slash, and CI's crawl only follows hrefs), and
 `check:play` was testing *changed* rather than *changed by one* — so it could not
 have seen a focused button firing `click` on top of the page's own key handler.
+A second playtest pass, after the guide and the two-segment difficulty curve went
+in ([`edab8fb`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-u7663394/commit/edab8fb)),
+produced the sharpest version of the same lesson: a scripted player scored 2–6 on
+every input path where the simulator said 13, which looked exactly like an unfair
+curve and was in fact 612ms of un-anchored error on its own first press.
 
 ## Where to look
 
-[`140898c...a5fc0de`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-u7663394/compare/140898c...a5fc0de)
+[`140898c...edab8fb`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-u7663394/compare/140898c...edab8fb)
 is the week; the spec tests were committed red first
 ([`3edaa9d`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-u7663394/commit/3edaa9d))
 and everything after is them going green. Nothing here can tell you whether a
