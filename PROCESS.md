@@ -36,11 +36,16 @@ retuning the rules on a hunch: my chosen knob moved only the expert's win rate.
 [`ee96fb8`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-u7663394/commit/ee96fb8)
 — five `CLAUDE.md` rules, including *`requestAnimationFrame` is a request, not a
 promise* (zero frames on one viewport, ~16/s on the other, so a canvas cleared by
-a resize stayed blank).
+a resize stayed blank). Two more sensors in
+[`a5fc0de`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-u7663394/commit/a5fc0de),
+both from looking rather than from a red check: the `og:image` was silently
+404ing (`BASE_URL` has no trailing slash, and CI's crawl only follows hrefs), and
+`check:play` was testing *changed* rather than *changed by one* — so it could not
+have seen a focused button firing `click` on top of the page's own key handler.
 
 ## Where to look
 
-[`140898c...ee96fb8`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-u7663394/compare/140898c...ee96fb8)
+[`140898c...a5fc0de`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-u7663394/compare/140898c...a5fc0de)
 is the week; the spec tests were committed red first
 ([`3edaa9d`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit5-u7663394/commit/3edaa9d))
 and everything after is them going green. Nothing here can tell you whether a

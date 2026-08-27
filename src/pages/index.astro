@@ -43,6 +43,23 @@ import "../styles/styles.css";
         <span class="verdict-again" aria-hidden="true">&#8635;</span>
       </div>
 
+      {/*
+        One control for all three input paths. A real <button> so mouse, touch
+        and keyboard arrive from the browser rather than from three handlers,
+        and full-bleed so a phone player is not aiming at a 44px target while
+        timing a moving slab.
+
+        data-code declares the binding for both Chrome sensors to read, rather
+        than either of them naming a letter of the keyboard: the day a game is
+        rebound from WASD to the arrows, a written-down table becomes a sensor
+        pressing keys bound to nothing and reporting a dead page.
+
+        Space is the declared binding --- it is the game's key, the one the
+        design is about. main.ts also accepts Enter, because a keyboard user who
+        has tabbed to a button expects Enter to work it; that is an
+        accessibility alias rather than a second control, so it is not declared
+        here. check:render presses Enter on the marked control anyway.
+      */}
       <button
         class="tap"
         type="button"
