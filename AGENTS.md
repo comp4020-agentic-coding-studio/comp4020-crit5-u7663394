@@ -552,6 +552,26 @@ needed one. Both Chrome sensors use CDP's `Input.dispatchKeyEvent`,
 **If a sensor says the page is broken, reproduce it by hand before changing the
 page.**
 
+**A real control gives you three input paths, and a fourth one you did not
+ask for.** The reason to build the control as a `button` is that mouse, keyboard
+and touch arrive without writing three handlers. The bill is that a *focused*
+button also activates natively: a Space or Enter press fires `click` on top of
+whatever the page already did, so one press becomes two moves the moment
+anything listens for `click`. It only happens after the control has been
+focused, which is why it survives a casual test. Two rules fall out:
+
+- **Handle a pointer with `pointerdown` and never also listen for `click`.**
+  One press, one path.
+- **`preventDefault()` in a global key handler is load-bearing for correctness,
+  not just for stopping the page scrolling.** It is what cancels the native
+  activation. Measured in C5 with a `click` handler planted: with the
+  `preventDefault`, one move per press; without it, **three**.
+
+And assert it by *counting moves*, not by watching for change --- "the state
+changed" is true of a doubled input too. **A doubled input is a move the game
+made and the player did not**, which is the mirror of the dropped-input rule
+above and ships more easily, because nothing looks wrong.
+
 **And the rule cuts both ways.** Two of C4's twenty `check:play` checks were red
 the first time they ran, and both times the bug was in the *test*: a voice count
 taken while the previous chord was still decaying (the engine was right; the

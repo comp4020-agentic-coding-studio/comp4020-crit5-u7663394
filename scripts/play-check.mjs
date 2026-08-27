@@ -112,12 +112,40 @@ try {
     await sleep(30);
     await key("keyUp", text, code, vk);
   };
-  // No mouse dispatcher here on purpose: the desktop pass drives by keyboard
-  // and the phone pass by touch, so one would be dead code and oxlint
-  // --deny-warnings is right to say so. If C5's game turns out to be
-  // mouse-driven, lift `mouse` back out of comp4020-crit4-u7663394's
-  // play-check.mjs rather than writing it again -- the buttons/buttons-mask
-  // pairing is easy to get subtly wrong.
+  // The mouse dispatcher is back, because C5's game IS mouse-driven: one
+  // button, and on the desktop marking viewport a marker reaches for the mouse
+  // before the keyboard. Note the buttons/buttons-mask pairing -- `button` names
+  // which button this event is about and `buttons` is the mask of what is held
+  // *during* it, so a press is (left, 1) and a release is (left, 0). Getting
+  // that wrong produces events Chrome delivers and the page ignores, which
+  // looks exactly like a broken page.
+  const mouse = async (x, y) => {
+    await send("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x,
+      y,
+      button: "none",
+      buttons: 0,
+      clickCount: 0,
+    });
+    await send("Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      x,
+      y,
+      button: "left",
+      buttons: 1,
+      clickCount: 1,
+    });
+    await sleep(40);
+    await send("Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      x,
+      y,
+      button: "left",
+      buttons: 0,
+      clickCount: 1,
+    });
+  };
   const touch = (type, touchPoints) =>
     send("Input.dispatchTouchEvent", { type, touchPoints });
 
@@ -214,15 +242,91 @@ try {
     // play it. Wire the specific rule -- the collision, the illegal move, the
     // last card -- as a focused assertion in spec/*.test.ts, where it runs in
     // milliseconds and does not need Chrome.
-    console.log("\nit can be lost");
     const bound = await json(
       `JSON.stringify([...new Set([...document.querySelectorAll("[data-code]")].map((el) => el.dataset.code))])`,
     );
+
+    // One input, one move -- on every path the artefact offers.
+    //
+    // The dropped-input rule in CLAUDE.md has a mirror that is just as bad and
+    // easier to ship: **a doubled input is a move the game made and the player
+    // did not.** A real <button> is the right way to get mouse, keyboard and
+    // touch for free, and the trap that comes with it is that a focused button
+    // activated by Space fires `click` *as well as* whatever key handler the
+    // page installed --- so the slab drops twice, once where the player meant
+    // and once wherever the sweep had got to. It is invisible in a screenshot,
+    // it only happens after the control has been focused, and "changed" is not
+    // enough to catch it. So these count moves rather than watching for change.
+    //
+    // Which paths exist is read off the page, never written down here: the keys
+    // come from [data-code], and the pointer target from the marked control.
+    console.log("\nevery input the page offers is exactly one move");
+    const stageRect = await rectOf("[data-core-interaction]");
+    const centre = {
+      x: Math.round(stageRect.x + stageRect.width / 2),
+      y: Math.round(stageRect.y + stageRect.height * 0.7),
+    };
+    /**
+     * Make one input and require the move counter to advance by exactly one.
+     *
+     * `prepare` runs AFTER the reload, not before, and that ordering is the
+     * whole reason it is a parameter. The first version set up the focused case
+     * outside this helper -- and when the preceding check happened to end the
+     * round, the reload in here threw the focus away, so the check quietly
+     * measured the *unfocused* path and passed. It only showed up because a
+     * planted double-fire fault failed to redden it: the check was fine, its
+     * precondition was being destroyed underneath it. A check whose setup a
+     * later step can undo is a check that reports on something else.
+     */
+    const oneMove = async (label, act, prepare) => {
+      if ((await probe()).over) await reload(1200, 900, false);
+      if (prepare) await prepare();
+      const start = await probe();
+      await act();
+      await sleep(SETTLE);
+      const after = await probe();
+      check(
+        label,
+        after.moves === start.moves + 1,
+        `moves ${start.moves} -> ${after.moves}`,
+      );
+    };
+
+    const focusControl = () =>
+      evaluate(
+        `(() => { document.querySelector("[data-core-interaction]").focus(); return "1"; })()`,
+      );
+    const blurControl = () =>
+      evaluate(`(() => { document.activeElement?.blur(); return "1"; })()`);
+
+    await oneMove(
+      "a mouse click drops once, not twice",
+      () => mouse(centre.x, centre.y),
+      blurControl,
+    );
+    if (bound.length > 0) {
+      await oneMove(
+        `a ${bound[0]} press drops once, not twice`,
+        async () => await tap(...press(bound[0])),
+        blurControl,
+      );
+      // ...and again with the control focused, which is the case that breaks:
+      // native activation and a page key handler both firing.
+      await oneMove(
+        `a ${bound[0]} press with the control focused still drops once`,
+        async () => await tap(...press(bound[0])),
+        focusControl,
+      );
+    }
+
+    console.log("\nit can be lost");
     check(
       "the page declares which keys it binds",
       bound.length > 0,
       bound.length ? bound.join(" ") : "no [data-code] anywhere",
     );
+
+    await reload(1200, 900, false);
 
     const keys = bound.length > 0 ? bound.map(press) : [];
 
@@ -313,13 +417,16 @@ try {
     };
     await touch("touchStart", [point]);
     await sleep(80);
+    // CDP's touchEnd lists the points that ENDED, not the ones that remain --
+    // an expectation the other way round was one of C4's two red-because-the-
+    // test-was-wrong checks. Reproduce a red check before changing the page.
     await touch("touchEnd", []);
     await sleep(SETTLE);
     const after = await probe();
     check(
-      "a tap on the phone changes the game state",
-      JSON.stringify(after) !== JSON.stringify(before),
-      `${JSON.stringify(before)} -> ${JSON.stringify(after)}`,
+      "a tap on the phone is exactly one move",
+      after.moves === before.moves + 1,
+      `moves ${before.moves} -> ${after.moves}`,
     );
   }
 

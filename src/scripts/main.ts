@@ -430,7 +430,21 @@ window.addEventListener(
     if (event.code !== "Space" && event.code !== "Enter") return;
     if (event.repeat) return; // a held key is one move, not sixty
     if (event.target instanceof HTMLAnchorElement) return; // let the link be a link
-    event.preventDefault(); // Space would otherwise scroll the page out from under it
+    // This preventDefault does TWO jobs and only one of them is obvious.
+    //
+    // The obvious one: Space scrolls the page out from under the game.
+    //
+    // The load-bearing one: it cancels the <button>'s NATIVE activation. Once
+    // the control has been focused --- which happens the first time anyone
+    // clicks it --- a Space press would otherwise fire `click` as well, and if
+    // anything ever listens for `click` the slab drops twice from one press.
+    // Measured with a `click` handler planted: with this line, one move; with it
+    // removed, three. That is a move the game made and the player did not, and
+    // it is invisible in a screenshot.
+    //
+    // check:play covers this ("a Space press with the control focused still
+    // drops once"), so if you delete this line something will say so.
+    event.preventDefault();
     drop();
   },
   { passive: false },

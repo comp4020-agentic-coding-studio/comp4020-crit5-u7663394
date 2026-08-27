@@ -73,6 +73,54 @@ describe("sensor: internal URLs survive the deploy base", () => {
   });
 });
 
+describe("sensor: the link-preview card actually resolves", () => {
+  it("points og:image at an absolute URL that exists in the build", () => {
+    // The invariants check the tag is *present*. That is not the failure mode:
+    // the failure mode is a card URL that is present, absolute, well-formed and
+    // wrong, which renders a shared link as a bare row of text.
+    //
+    // C5 shipped exactly that. `${import.meta.env.BASE_URL}card.png` looks
+    // obviously correct and concatenated to ".../comp4020-crit5-u7663394card.png",
+    // because `base` in astro.config.ts carries no trailing slash. Nothing in
+    // this repo or in CI noticed: the link crawl only follows hrefs, so a broken
+    // og:image fails silently, on someone else's timeline, in an unfurl nobody
+    // involved ever sees.
+    //
+    // A sensor rather than a contract test: every week has a card, and this is
+    // the check that would have caught it.
+    for (const { name, doc } of pages) {
+      const card = doc
+        .querySelector('meta[property="og:image"]')
+        ?.getAttribute("content")
+        ?.trim();
+      expect(card, `${name}: no og:image`).toBeTruthy();
+
+      // Absolute on purpose --- a scraper resolves it from somewhere else
+      // entirely, so this is the one URL that must not be relative.
+      expect(
+        /^https?:\/\//.test(card!),
+        `${name}: og:image "${card}" is not absolute. A scraper resolves it ` +
+          `from its own origin, not from this page.`,
+      ).toBe(true);
+
+      const path = new URL(card!).pathname;
+      expect(
+        path.startsWith(`${BASE}/`),
+        `${name}: og:image path "${path}" does not sit under the deploy base ` +
+          `"${BASE}/", so it will 404 on the live URL. The usual cause is ` +
+          `concatenating BASE_URL without normalising its trailing slash.`,
+      ).toBe(true);
+
+      const asset = path.slice(BASE.length + 1);
+      expect(
+        shipped.includes(asset),
+        `${name}: og:image resolves to "${asset}", which the build did not ` +
+          `emit. Files in dist/: ${shipped.filter((f) => !f.includes("/")).join(", ")}`,
+      ).toBe(true);
+    }
+  });
+});
+
 describe("sensor: the marked control is a real control", () => {
   it("builds every marked control as a real interactive element", () => {
     // A real element gets mouse, keyboard and touch from the browser; a div

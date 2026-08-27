@@ -16,7 +16,16 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
-const card = new URL(`${import.meta.env.BASE_URL}card.png`, Astro.site).href;
+
+// BASE_URL is whatever `base` says in astro.config.ts, and `base` there has no
+// trailing slash --- so the obvious `${BASE_URL}card.png` concatenated to
+// ".../comp4020-crit5-u7663394card.png" and shipped a 404 that renders as a
+// bare row of text in every unfurl. It looked right in the source and the
+// invariants only check the tag is present. Normalise the slash rather than
+// trusting the config's shape; spec/sensors.test.ts now checks the result
+// resolves to a real file in dist/.
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const card = new URL(`${base}card.png`, Astro.site).href;
 ---
 
 <!doctype html>
